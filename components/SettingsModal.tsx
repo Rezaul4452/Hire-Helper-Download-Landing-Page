@@ -14,8 +14,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, items, o
 
   useEffect(() => {
     if (isOpen) {
-      // Create a new array with shallow copies of items to avoid circular reference errors
-      // from Firestore objects and to prevent direct mutation of the original state.
       setEditableItems(items.map(item => ({ ...item })));
     }
   }, [isOpen, items]);
@@ -44,7 +42,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, items, o
   };
 
   const handleRemoveItem = (id: string) => {
-    setEditableItems(prevItems => prevItems.filter(item => item.id !== id));
+    const itemToRemove = editableItems.find(item => item.id === id);
+    if (!itemToRemove) return;
+
+    if (window.confirm(`Are you sure you want to delete "${itemToRemove.title}"?`)) {
+        setEditableItems(prevItems => prevItems.filter(item => item.id !== id));
+    }
   };
 
   const handleSave = async () => {

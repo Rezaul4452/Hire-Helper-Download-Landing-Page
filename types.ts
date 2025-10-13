@@ -4,4 +4,5 @@ export interface DownloadItem {
   downloadUrl: string;
   refreshUrl:string;
   group?: string;
+  lastRefreshed?: string;
 }
