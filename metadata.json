@@ -1,0 +1,5 @@
+{
+  "name": "Hire Helper",
+  "description": "A customizable landing page for managing and accessing frequently used download and data refresh links. Set up your own titles and links for download and refresh buttons via the settings panel.",
+  "requestFramePermissions": []
+}
