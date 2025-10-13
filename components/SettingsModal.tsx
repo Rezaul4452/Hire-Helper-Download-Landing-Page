@@ -6,7 +6,7 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   items: DownloadItem[];
-  onSave: (items: DownloadItem[]) => void;
+  onSave: (items: DownloadItem[]) => Promise<void> | void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, items, onSave }) => {
@@ -14,7 +14,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, items, o
 
   useEffect(() => {
     if (isOpen) {
-      setEditableItems(JSON.parse(JSON.stringify(items))); // Deep copy to avoid mutating props
+      // Create a new array with shallow copies of items to avoid circular reference errors
+      // from Firestore objects and to prevent direct mutation of the original state.
+      setEditableItems(items.map(item => ({ ...item })));
     }
   }, [isOpen, items]);
 
@@ -45,8 +47,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, items, o
     setEditableItems(prevItems => prevItems.filter(item => item.id !== id));
   };
 
-  const handleSave = () => {
-    onSave(editableItems);
+  const handleSave = async () => {
+    await onSave(editableItems);
     onClose();
   };
 

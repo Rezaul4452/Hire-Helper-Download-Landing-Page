@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DownloadItem } from './types';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useFirestore } from './hooks/useFirestore';
 import DownloadCard from './components/DownloadCard';
 import SettingsModal from './components/SettingsModal';
 import { SettingsIcon } from './components/icons';
@@ -123,7 +123,7 @@ const DEFAULT_ITEMS: DownloadItem[] = [
 
 const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [downloadItems, setDownloadItems] = useLocalStorage<DownloadItem[]>('downloadItems', DEFAULT_ITEMS);
+  const { data: downloadItems, setData: setDownloadItems, loading, error } = useFirestore<DownloadItem>('downloadItems', DEFAULT_ITEMS);
 
   const groupedItems = React.useMemo(() => {
     return downloadItems.reduce((acc, item) => {
@@ -135,6 +135,36 @@ const App: React.FC = () => {
     return acc;
   }, {} as Record<string, DownloadItem[]>);
   }, [downloadItems]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+        <div className="flex items-center space-x-2 text-slate-500 dark:text-slate-400">
+          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Loading settings...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+       <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-center p-4">
+         <div>
+           <h2 className="text-2xl font-bold text-red-500 mb-2">Configuration Error</h2>
+           <p className="text-slate-600 dark:text-slate-300 mb-4">
+             Could not load settings from the database. Please add your Firebase project configuration to the <code>firebase.ts</code> file.
+           </p>
+            <pre className="text-left bg-slate-200 dark:bg-slate-800 p-4 rounded-md text-sm text-red-500 overflow-x-auto">
+                <code>{error}</code>
+            </pre>
+         </div>
+       </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans">
