@@ -1,4 +1,5 @@
-import { initializeApp } from "firebase/app";
+// Fix: Changed to a namespace import to address potential module resolution issues.
+import * as firebaseApp from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
@@ -43,5 +44,6 @@ const firebaseConfig = {
 // ❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗❗
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Fix: Use the namespace import to initialize the app.
+const app = firebaseApp.initializeApp(firebaseConfig);
 export const db = getFirestore(app);

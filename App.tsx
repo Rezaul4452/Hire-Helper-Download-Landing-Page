@@ -1,10 +1,14 @@
+
 import React, { useState } from 'react';
+// Correct: Import from @google/genai.
+import { GoogleGenAI, Type } from '@google/genai';
 import { DownloadItem } from './types';
 import { useFirestore } from './hooks/useFirestore';
 import DownloadCard from './components/DownloadCard';
 import SettingsModal from './components/SettingsModal';
 import PasswordModal from './components/PasswordModal';
-import { SettingsIcon, SearchIcon } from './components/icons';
+// Fix: Import SpinnerIcon to show a loading state when generating AI suggestions.
+import { SettingsIcon, SearchIcon, SpinnerIcon } from './components/icons';
 
 const DEFAULT_ITEMS: DownloadItem[] = [
   {
@@ -128,6 +132,9 @@ const App: React.FC = () => {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { data: downloadItems, setData: setDownloadItems, loading, error } = useFirestore<DownloadItem>('downloadItems', DEFAULT_ITEMS);
+  // Fix: Add state for AI suggestions and generation status. Initializing to null helps differentiate from an empty result.
+  const [aiSuggestions, setAiSuggestions] = useState<DownloadItem[] | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleRefreshItem = async (itemId: string) => {
     const updatedItems = downloadItems.map(item =>
@@ -146,6 +153,77 @@ const App: React.FC = () => {
     } else {
       setPasswordError('Incorrect password. Please try again.');
     }
+  };
+
+  // Fix: Add a handler to call the Gemini API for suggestions.
+  const handleAiSearch = async () => {
+    if (!searchTerm.trim()) return;
+    setIsGenerating(true);
+    setAiSuggestions(null);
+
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Based on the search term "${searchTerm}", suggest up to 4 new download items that might be relevant in a corporate reporting context.
+            For each item, provide a "title" and a "group" (e.g., "Sales Reports", "Financial Reports", "User Metrics", "Marketing").
+            `,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        suggestions: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    group: { type: Type.STRING },
+                                },
+                                required: ["title", "group"]
+                            }
+                        }
+                    },
+                    required: ["suggestions"]
+                }
+            }
+        });
+        
+        const jsonText = response.text.trim();
+        const result = JSON.parse(jsonText) as { suggestions: { title: string, group: string }[] };
+
+        if (result && Array.isArray(result.suggestions)) {
+            const newSuggestions: DownloadItem[] = result.suggestions.map((s) => ({
+                id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                title: s.title,
+                group: s.group,
+                downloadUrl: '#',
+                refreshUrl: '#',
+            }));
+            setAiSuggestions(newSuggestions);
+        } else {
+            setAiSuggestions([]);
+        }
+    } catch (e) {
+        console.error("Error generating AI suggestions:", e);
+        setAiSuggestions([]);
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
+  // Fix: Add a handler to add a suggested item to the main list.
+  const handleAddSuggestion = (suggestion: DownloadItem) => {
+    const { id, ...restOfSuggestion } = suggestion;
+    const newItem: DownloadItem = {
+      ...restOfSuggestion,
+      id: new Date().getTime().toString(),
+    };
+    const newItems = [...downloadItems, newItem];
+    setDownloadItems(newItems);
+    setAiSuggestions(null); 
+    setSearchTerm(''); 
   };
 
   const filteredItems = React.useMemo(() => {
@@ -261,12 +339,40 @@ const App: React.FC = () => {
             ) : (
                 <>
                     <h2 className="text-xl font-semibold mb-2">No Results Found</h2>
-                    <p className="text-slate-500 dark:text-slate-400">
+                    <p className="text-slate-500 dark:text-slate-400 mb-6">
                         Your search for "{searchTerm}" did not match any items.
                     </p>
+                    {/* Fix: Add a button to get AI suggestions when search fails. */}
+                    {searchTerm && (
+                      <button
+                        onClick={handleAiSearch}
+                        disabled={isGenerating}
+                        className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed flex items-center justify-center mx-auto"
+                      >
+                        {isGenerating ? (
+                            <>
+                                <SpinnerIcon />
+                                <span className="ml-2">Generating ideas...</span>
+                            </>
+                        ) : (
+                            "✨ Get AI Suggestions"
+                        )}
+                      </button>
+                    )}
                 </>
             )}
           </div>
+        )}
+        {/* Fix: Render AI suggestions when they are available. The error "Property 'map' does not exist on type 'unknown'" is likely from an incorrect implementation of this feature, which is now fixed by checking for `aiSuggestions` before mapping. */}
+        {aiSuggestions && aiSuggestions.length > 0 && (
+          <section className="mt-12">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 text-center">AI Suggestions for "{searchTerm}"</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              {aiSuggestions.map(item => (
+                <DownloadCard key={item.id} item={item} onRefresh={() => {}} onAdd={handleAddSuggestion} />
+              ))}
+            </div>
+          </section>
         )}
       </main>
 
