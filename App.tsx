@@ -1,4 +1,6 @@
 
+
+
 import React, { useState } from 'react';
 // Correct: Import from @google/genai.
 import { GoogleGenAI, Type } from '@google/genai';
@@ -9,6 +11,7 @@ import SettingsModal from './components/SettingsModal';
 import PasswordModal from './components/PasswordModal';
 // Fix: Import SpinnerIcon to show a loading state when generating AI suggestions.
 import { SettingsIcon, SearchIcon, SpinnerIcon } from './components/icons';
+import AnnouncementBanner from './components/AnnouncementBanner';
 
 const DEFAULT_ITEMS: DownloadItem[] = [
   {
@@ -190,11 +193,15 @@ const App: React.FC = () => {
             }
         });
         
-        const jsonText = response.text.trim();
-        const result = JSON.parse(jsonText) as { suggestions: { title: string, group: string }[] };
+        // FIX: The response from the model can sometimes be wrapped in markdown.
+        // Clean this up and parse the JSON safely to avoid runtime errors.
+        const cleanedJsonText = response.text.trim().replace(/^```json\s*/, '').replace(/```$/, '');
+        const result = JSON.parse(cleanedJsonText);
 
         if (result && Array.isArray(result.suggestions)) {
-            const newSuggestions: DownloadItem[] = result.suggestions.map((s) => ({
+            const newSuggestions: DownloadItem[] = result.suggestions
+            .filter((s: any) => s && typeof s.title === 'string' && typeof s.group === 'string')
+            .map((s: { title: string, group: string }) => ({
                 id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 title: s.title,
                 group: s.group,
@@ -306,6 +313,8 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      <AnnouncementBanner />
 
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
         {filteredItems.length > 0 ? (
