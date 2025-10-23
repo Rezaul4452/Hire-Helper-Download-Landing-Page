@@ -6,9 +6,11 @@ interface PasswordModalProps {
   onClose: () => void;
   onSubmit: (password: string) => void;
   error: string | null;
+  title?: string;
+  description?: string;
 }
 
-const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, onSubmit, error }) => {
+const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, onSubmit, error, title, description }) => {
   const [password, setPassword] = useState('');
 
   useEffect(() => {
@@ -37,7 +39,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, onSubmit
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl max-w-sm w-full">
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Enter Password</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title || 'Enter Password'}</h2>
           <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
             <CloseIcon />
           </button>
@@ -46,7 +48,7 @@ const PasswordModal: React.FC<PasswordModalProps> = ({ isOpen, onClose, onSubmit
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <label htmlFor="password-input" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Please enter the password to access settings.
+              {description || 'Please enter the password to access settings.'}
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -1,6 +1,5 @@
 
 
-
 import React, { useState } from 'react';
 // Correct: Import from @google/genai.
 import { GoogleGenAI, Type } from '@google/genai';
@@ -10,7 +9,8 @@ import DownloadCard from './components/DownloadCard';
 import SettingsModal from './components/SettingsModal';
 import PasswordModal from './components/PasswordModal';
 // Fix: Import SpinnerIcon to show a loading state when generating AI suggestions.
-import { SettingsIcon, SearchIcon, SpinnerIcon } from './components/icons';
+// Add SwitchHorizontalIcon for page navigation.
+import { SettingsIcon, SearchIcon, SpinnerIcon, SwitchHorizontalIcon } from './components/icons';
 import AnnouncementBanner from './components/AnnouncementBanner';
 
 const DEFAULT_ITEMS: DownloadItem[] = [
@@ -130,12 +130,26 @@ const DEFAULT_ITEMS: DownloadItem[] = [
 
 
 const App: React.FC = () => {
+  const [page, setPage] = useState<'general' | 'special'>('general');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPasswordPromptOpen, setIsPasswordPromptOpen] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [isSpecialPasswordPromptOpen, setIsSpecialPasswordPromptOpen] = useState(false);
+  const [specialPasswordError, setSpecialPasswordError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { data: downloadItems, setData: setDownloadItems, loading, error } = useFirestore<DownloadItem>('downloadItems', DEFAULT_ITEMS);
-  // Fix: Add state for AI suggestions and generation status. Initializing to null helps differentiate from an empty result.
+
+  // Use separate Firestore hooks for each page
+  const { data: generalItems, setData: setGeneralItems, loading: generalLoading, error: generalError } = useFirestore<DownloadItem>('downloadItems', DEFAULT_ITEMS);
+  const { data: specialItems, setData: setSpecialItems, loading: specialLoading, error: specialError } = useFirestore<DownloadItem>('specialDownloadItems', []);
+
+  // Dynamically select data and functions based on the current page
+  const isGeneralPage = page === 'general';
+  const downloadItems = isGeneralPage ? generalItems : specialItems;
+  const setDownloadItems = isGeneralPage ? setGeneralItems : setSpecialItems;
+  const loading = isGeneralPage ? generalLoading : specialLoading;
+  const error = isGeneralPage ? generalError : specialError;
+  const pageTitle = isGeneralPage ? 'General Work' : 'Special Work';
+
   const [aiSuggestions, setAiSuggestions] = useState<DownloadItem[] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -158,7 +172,16 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Add a handler to call the Gemini API for suggestions.
+  const handleSpecialPasswordSubmit = (password: string) => {
+    if (password === '4452') {
+      setPage('special');
+      setIsSpecialPasswordPromptOpen(false);
+      setSpecialPasswordError(null);
+    } else {
+      setSpecialPasswordError('Incorrect password. Please try again.');
+    }
+  };
+
   const handleAiSearch = async () => {
     if (!searchTerm.trim()) return;
     setIsGenerating(true);
@@ -193,15 +216,15 @@ const App: React.FC = () => {
             }
         });
         
-        // FIX: The response from the model can sometimes be wrapped in markdown.
-        // Clean this up and parse the JSON safely to avoid runtime errors.
         const cleanedJsonText = response.text.trim().replace(/^```json\s*/, '').replace(/```$/, '');
-        const result = JSON.parse(cleanedJsonText);
+        // FIX: The result of JSON.parse is 'any'. Under stricter TypeScript rules, it could be 'unknown'.
+        // By casting and then validating the structure, we make the code more type-safe and prevent potential runtime errors.
+        const result = JSON.parse(cleanedJsonText) as { suggestions?: unknown[] };
 
         if (result && Array.isArray(result.suggestions)) {
             const newSuggestions: DownloadItem[] = result.suggestions
-            .filter((s: any) => s && typeof s.title === 'string' && typeof s.group === 'string')
-            .map((s: { title: string, group: string }) => ({
+            .filter((s: any): s is { title: string; group: string } => s && typeof s.title === 'string' && typeof s.group === 'string')
+            .map((s) => ({
                 id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
                 title: s.title,
                 group: s.group,
@@ -220,7 +243,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Fix: Add a handler to add a suggested item to the main list.
   const handleAddSuggestion = (suggestion: DownloadItem) => {
     const { id, ...restOfSuggestion } = suggestion;
     const newItem: DownloadItem = {
@@ -262,7 +284,7 @@ const App: React.FC = () => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>Loading settings...</span>
+          <span>Loading data...</span>
         </div>
       </div>
     );
@@ -303,13 +325,23 @@ const App: React.FC = () => {
                 aria-label="Search reports"
               />
             </div>
-            <button
-              onClick={() => setIsPasswordPromptOpen(true)}
-              className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-100 dark:focus:ring-offset-slate-900 focus:ring-sky-500 transition-colors"
-              aria-label="Open settings"
-            >
-              <SettingsIcon />
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={isGeneralPage ? () => setIsSpecialPasswordPromptOpen(true) : () => setPage('general')}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-100 dark:focus:ring-offset-slate-900 focus:ring-sky-500 transition-colors"
+                aria-label={isGeneralPage ? "Go to Special Work Page" : "Go to General Work Page"}
+              >
+                <SwitchHorizontalIcon className="h-5 w-5"/>
+                <span>{isGeneralPage ? 'Special Work' : 'General Work'}</span>
+              </button>
+              <button
+                onClick={() => setIsPasswordPromptOpen(true)}
+                className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-100 dark:focus:ring-offset-slate-900 focus:ring-sky-500 transition-colors"
+                aria-label="Open settings"
+              >
+                <SettingsIcon />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -317,6 +349,7 @@ const App: React.FC = () => {
       <AnnouncementBanner />
 
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-8 tracking-tight">{pageTitle} Page</h2>
         {filteredItems.length > 0 ? (
            <div className="space-y-12">
             {Object.entries(groupedItems).map(([groupName, items]) => (
@@ -351,7 +384,6 @@ const App: React.FC = () => {
                     <p className="text-slate-500 dark:text-slate-400 mb-6">
                         Your search for "{searchTerm}" did not match any items.
                     </p>
-                    {/* Fix: Add a button to get AI suggestions when search fails. */}
                     {searchTerm && (
                       <button
                         onClick={handleAiSearch}
@@ -372,7 +404,6 @@ const App: React.FC = () => {
             )}
           </div>
         )}
-        {/* Fix: Render AI suggestions when they are available. The error "Property 'map' does not exist on type 'unknown'" is likely from an incorrect implementation of this feature, which is now fixed by checking for `aiSuggestions` before mapping. */}
         {aiSuggestions && aiSuggestions.length > 0 && (
           <section className="mt-12">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-4 text-center">AI Suggestions for "{searchTerm}"</h2>
@@ -393,6 +424,20 @@ const App: React.FC = () => {
         }}
         onSubmit={handlePasswordSubmit}
         error={passwordError}
+        title="Settings Access"
+        description="Please enter the password to access settings."
+      />
+      
+      <PasswordModal
+        isOpen={isSpecialPasswordPromptOpen}
+        onClose={() => {
+          setIsSpecialPasswordPromptOpen(false);
+          setSpecialPasswordError(null);
+        }}
+        onSubmit={handleSpecialPasswordSubmit}
+        error={specialPasswordError}
+        title="Access Restricted"
+        description="Please enter the password to access the Special Work Page."
       />
 
       <SettingsModal
